@@ -19,12 +19,18 @@ class WallStop():
         rate = rospy.Rate(10)
         data = Twist()
 
+        accel = 0.02
+        data.linear.x = 0.0
         while not rospy.is_shutdown():
-            #4つのセンサの値が500未満のときTwist型の変数dataのlinear.xに速度0.2m/sを与える
-            data.linear.x = 0.2 if self.sensor_values.sum_all < 500 else 0.0
-            #dataをパブリッシュしている
+            data.linear.x += accel
+
+            if self.sensor_values.sum_all >= 50: data.linear.x = 0.0
+            elif data.linear.x <= 0.2:           data.linear.x = 0.2
+            elif data.linear.x >= 0.8:           data.linear.x = 0.8
+
             self.cmd_vel.publish(data)
             rate.sleep()
+
 
 if __name__ == '__main__':
     rospy.init_node('wall_stop')

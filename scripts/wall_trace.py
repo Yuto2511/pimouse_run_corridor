@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 #encoding: utf8
-import rospy, copy
+import rospy, copy, math
 from geometry_msgs.msg import Twist
 from std_srvs.srv import Trigger, TriggerResponse
 from pimouse_ros.msg import LightSensorValues
@@ -19,12 +19,27 @@ class WallStop():
         rate = rospy.Rate(10)
         data = Twist()
 
+        accel = 0.02
         while not rospy.is_shutdown():
-            #4つのセンサの値が500未満のときTwist型の変数dataのlinear.xに速度0.2m/sを与える
-            data.linear.x = 0.2 if self.sensor_values.sum_all < 500 else 0.0
-            #dataをパブリッシュしている
+            s = self.sensor_values
+            data.linear.x += accel
+
+            if s.sum_forward >= 50:    data.linear.x = 0.0
+            elif data.linear.x <= 0.2: data.linear.x = 0.2
+            elif data.linear.x >= 0.8: data.linear.x = 0.8
+
+            #静止時に回転しないようにしている。移動時の速度は0.2以上
+            if data.linear.x < 0.2:   data.angular.z = 0.0
+            #曲り角で左側に壁がなくなった場合曲がらないようにするために角速度0
+            elif s.left_side < 10:    data.angular.z = 0.0
+            else:
+                target = 50
+                error = (target - s.left_side)/50.0
+                data.angular.z = error * 3 * math.pi / 180.0
+                
             self.cmd_vel.publish(data)
             rate.sleep()
+
 
 if __name__ == '__main__':
     rospy.init_node('wall_stop')
